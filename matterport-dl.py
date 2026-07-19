@@ -1375,23 +1375,22 @@ class OurSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
         return False
 
     def do_GraphRequest(self, option_name: str):
-        post_msg = None
         logLevel = logging.INFO
-        if option_name in GRAPH_DATA_REQ:
-            self.send_response(200)
-            self.end_headers()
-            file_path = f"api/mp/models/graph_{option_name}.json"
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="UTF-8") as f:
-                    self.wfile.write(f.read().encode("utf-8"))
-                    post_msg = f"graph of operationName: {option_name} we are handling internally"
-            else:
-                logLevel = logging.WARNING
-                post_msg = f"graph for operationName: {option_name} we don't know how to handle, but likely could add support, returning empty instead. If you get an error this may be why (include this message in bug report)."
-                self.wfile.write(bytes('{"data": "empty"}', "utf-8"))
+        # always answer with a valid HTTP response, an unknown operationName must not close the connection empty
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        file_path = f"api/mp/models/graph_{option_name}.json"
+        if option_name is not None and re.fullmatch(r"\w+", option_name) and os.path.exists(file_path):
+            with open(file_path, "r", encoding="UTF-8") as f:
+                self.wfile.write(f.read().encode("utf-8"))
+            post_msg = f"graph of operationName: {option_name} we are handling internally"
+        else:
+            logLevel = logging.WARNING
+            post_msg = f"graph for operationName: {option_name} we don't know how to handle, but likely could add support, returning empty instead. If you get an error this may be why (include this message in bug report)."
+            self.wfile.write(bytes('{"data": "empty"}', "utf-8"))
 
-        if post_msg is not None:
-            consoleDebugLog(f"Handling a graph request on {self.path}: {post_msg}", loglevel=logLevel)
+        consoleDebugLog(f"Handling a graph request on {self.path}: {post_msg}", loglevel=logLevel)
 
     def do_POST(self):
         post_msg = None
