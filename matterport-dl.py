@@ -1309,8 +1309,10 @@ class OurSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
         global BASE_MATTERPORTDL_DIR
         redirect_msg = None
         orig_request = self.path
-        if not CLA.getCommandLineArg(CommandLineArg.TILDE):
-            self.path = self.path.replace("~", "_")
+        if not CLA.getCommandLineArg(CommandLineArg.TILDE) and "~" in self.path:
+            # archives made by old forks store assets under literal ~ dirs, keep the request as-is when that file exists
+            if not os.path.exists(f".{urllib.parse.unquote(self.getRawPath())}"):
+                self.path = self.path.replace("~", "_")
 
         orig_raw_path = raw_path = self.getRawPath()
         query = self.getQuery()
@@ -1384,8 +1386,11 @@ class OurSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
         if option_name is not None and re.fullmatch(r"\w+", option_name) and os.path.exists(file_path):
             with open(file_path, "r", encoding="UTF-8") as f:
                 text = f.read()
-            # archives made by old forks baked their local server origin (http://127.0.0.1:8080) into the saved graph responses, make those root-relative so they work on any host/port
-            text = re.sub(r"https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/", "/", text)
+            # archives made by old forks baked their local server origin (http://127.0.0.1:8080) into the saved graph responses, point those at whatever host we are being reached on instead; must stay absolute as the showcase url machinery rejects relative urls here
+            request_host = self.headers.get("Host")
+            if request_host is not None:
+                scheme = self.headers.get("X-Forwarded-Proto", "http")
+                text = re.sub(r"https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/", f"{scheme}://{request_host}/", text)
             self.wfile.write(text.encode("utf-8"))
             post_msg = f"graph of operationName: {option_name} we are handling internally"
         else:
