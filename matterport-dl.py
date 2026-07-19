@@ -1383,7 +1383,10 @@ class OurSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
         file_path = f"api/mp/models/graph_{option_name}.json"
         if option_name is not None and re.fullmatch(r"\w+", option_name) and os.path.exists(file_path):
             with open(file_path, "r", encoding="UTF-8") as f:
-                self.wfile.write(f.read().encode("utf-8"))
+                text = f.read()
+            # archives made by old forks baked their local server origin (http://127.0.0.1:8080) into the saved graph responses, make those root-relative so they work on any host/port
+            text = re.sub(r"https?://(?:127\.0\.0\.1|localhost)(?::\d+)?/", "/", text)
+            self.wfile.write(text.encode("utf-8"))
             post_msg = f"graph of operationName: {option_name} we are handling internally"
         else:
             logLevel = logging.WARNING
